@@ -72,10 +72,14 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private void handleAiRequest(long chatId, String messageText) {
-        try {
-            Integer typingMessageId = sendTypingMessage(chatId);
+        Thread typingThread = null;
+        Integer typingMessageId = null;
 
-            Thread typingThread = new Thread(() -> {
+        try {
+            typingMessageId = sendTypingMessage(chatId);
+
+            // Создаем и запускаем поток с индикатором печатания
+            typingThread = new Thread(() -> {
                 while (!Thread.currentThread().isInterrupted()) {
                     try {
                         SendChatAction chatAction = new SendChatAction();
@@ -94,16 +98,34 @@ public class TelegramBot extends TelegramLongPollingBot {
             String aiResponse = deepseekService.askDeepseek(messageText);
             log.info("AI response: {}", aiResponse);
 
-            typingThread.interrupt();
+            if (typingThread != null) {
+                typingThread.interrupt();
+            }
 
             if (typingMessageId != null) {
                 deleteMessage(chatId, typingMessageId);
             }
 
+
             sendMessage(chatId, "\uD83E\uDD16 Ответ ИИ: \n" + aiResponse);
+
         } catch (IOException e) {
             log.error("Ошибка при запросе к Deepseek API: {}", e.getMessage());
-            sendMessage(chatId, "❌ Произошла ошибка при обработке запроса.");
+
+            if (typingThread != null) {
+                typingThread.interrupt();
+            }
+
+            if (typingMessageId != null) {
+                deleteMessage(chatId, typingMessageId);
+            }
+
+            sendMessage(chatId, "❌ Ошибка при обработке запроса. Пожалуйста, попробуйте еще раз.");
+
+        } finally {
+            if (typingThread != null && typingThread.isAlive()) {
+                typingThread.interrupt();
+            }
         }
     }
 

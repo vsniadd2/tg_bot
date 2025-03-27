@@ -10,8 +10,8 @@ import java.util.concurrent.TimeUnit;
 
 @Service
 public class DeepseekService {
-    private static final String DEEPSEEK_API_KEY = "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";
-    private static final String DEEPSEEK_API_URL = "https://openrouter.ai/api/v1/chat/completions";
+    private static final String DEEPSEEK_API_KEY = "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";
+    private static final String DEEPSEEK_API_URL = "https://openrouter.ai/api/v1/chat/completions1";
 
     public String askDeepseek(String question) throws IOException {
         OkHttpClient client = new OkHttpClient.Builder()
