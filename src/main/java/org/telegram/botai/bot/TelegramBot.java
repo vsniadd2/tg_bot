@@ -8,12 +8,15 @@ import org.telegram.botai.service.OpenRouterService;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.ActionType;
 import org.telegram.telegrambots.meta.api.methods.send.SendChatAction;
+import org.telegram.telegrambots.meta.api.methods.send.SendMediaGroup;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.media.InputMedia;
+import org.telegram.telegrambots.meta.api.objects.media.InputMediaPhoto;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.KeyboardRow;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
@@ -69,10 +72,10 @@ public class TelegramBot extends TelegramLongPollingBot {
                 handleAiRequest(chatId, messageText);
             } else if (messageText.equals("Портфолио")) {
                 sendPortfolioPhoto(chatId);
-            } else if(messageText.equals("/commands")){
+            } else if (messageText.equals("/commands")) {
                 //todo - список всех команд
-                sendMessage(chatId,"привет еблан");
-            }else {
+                sendMessage(chatId, "привет еблан");
+            } else {
                 sendMessage(chatId, "выберите действие:");
             }
         }
@@ -220,14 +223,26 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
+    //todo - вставитьссылки для фото портфолио
     private void sendPortfolioPhoto(long chatId) {
         try {
-            SendPhoto photo = new SendPhoto();
-            photo.setChatId(chatId);
+            List<InputMedia> medias = new ArrayList<>();
 
-            photo.setPhoto(new InputFile("https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSp42_VqHwzHJS1R0CKZ0YH_zMpaWZfy-6KsQ&s"));
+            InputMediaPhoto photo = new InputMediaPhoto();
+            photo.setMedia("ссылку1");
 
-            execute(photo);
+            InputMediaPhoto photo1 = new InputMediaPhoto();
+            photo.setMedia("ссылку2");
+
+            medias.add(photo);
+            medias.add(photo1);
+
+            SendMediaGroup mediaGroup = new SendMediaGroup();
+            mediaGroup.setChatId(chatId);
+            mediaGroup.setMedias(medias);
+
+            execute(mediaGroup);
+
         } catch (TelegramApiException e) {
             log.error("ошибка фото портфолио");
             throw new RuntimeException(e);
