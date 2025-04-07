@@ -13,7 +13,7 @@ public class BotConfig {
     TelegramBotsApi telegramBotsApi(TelegramBot bot) throws TelegramApiException {
         TelegramBotsApi api = new TelegramBotsApi(DefaultBotSession.class);
         api.registerBot(bot);
-        System.out.println("бот зареган");
+        System.out.println("Bot registered");
         return api;
     }
 }

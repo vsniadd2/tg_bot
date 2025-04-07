@@ -4,12 +4,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.telegram.botai.service.DeepseekService;
+import org.telegram.botai.service.OpenRouterService;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.ActionType;
 import org.telegram.telegrambots.meta.api.methods.send.SendChatAction;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
+import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.ReplyKeyboardMarkup;
@@ -31,7 +33,7 @@ public class TelegramBot extends TelegramLongPollingBot {
     @Value("${bot.token}")
     private String botToken;
 
-    private final DeepseekService deepseekService;
+    private final OpenRouterService openRouterService;
     private final Map<Long, Boolean> aiModeActive = new ConcurrentHashMap<>();
 
     @Override
@@ -65,7 +67,12 @@ public class TelegramBot extends TelegramLongPollingBot {
 
             } else if (Boolean.TRUE.equals(aiModeActive.get(chatId))) {
                 handleAiRequest(chatId, messageText);
-            } else {
+            } else if (messageText.equals("Портфолио")) {
+                sendPortfolioPhoto(chatId);
+            } else if(messageText.equals("/commands")){
+                //todo - список всех команд
+                sendMessage(chatId,"привет еблан");
+            }else {
                 sendMessage(chatId, "выберите действие:");
             }
         }
@@ -74,7 +81,6 @@ public class TelegramBot extends TelegramLongPollingBot {
     private void handleAiRequest(long chatId, String messageText) {
         Thread typingThread = null;
         Integer typingMessageId = null;
-
         try {
             typingMessageId = sendTypingMessage(chatId);
 
@@ -95,7 +101,7 @@ public class TelegramBot extends TelegramLongPollingBot {
             });
             typingThread.start();
 
-            String aiResponse = deepseekService.askDeepseek(messageText);
+            String aiResponse = openRouterService.askOpenRouter(messageText);
             log.info("AI response: {}", aiResponse);
 
             if (typingThread != null) {
@@ -186,8 +192,11 @@ public class TelegramBot extends TelegramLongPollingBot {
         row.add("Использовать ИИ(Beta version)");
         row.add("О разработчике");
 
-        keyboard.add(row);
+        KeyboardRow row1 = new KeyboardRow();
+        row1.add("Портфолио");
 
+        keyboard.add(row);
+        keyboard.add(row1);
         keyboardMarkup.setKeyboard(keyboard);
         keyboardMarkup.setResizeKeyboard(true);
         message.setReplyMarkup(keyboardMarkup);
@@ -210,4 +219,19 @@ public class TelegramBot extends TelegramLongPollingBot {
             log.error("Ошибка при отправке сообщения: {}", e.getMessage());
         }
     }
+
+    private void sendPortfolioPhoto(long chatId) {
+        try {
+            SendPhoto photo = new SendPhoto();
+            photo.setChatId(chatId);
+
+            photo.setPhoto(new InputFile("https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSp42_VqHwzHJS1R0CKZ0YH_zMpaWZfy-6KsQ&s"));
+
+            execute(photo);
+        } catch (TelegramApiException e) {
+            log.error("ошибка фото портфолио");
+            throw new RuntimeException(e);
+        }
+    }
+
 }
