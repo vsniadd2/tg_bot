@@ -82,10 +82,9 @@ public class TelegramBot extends TelegramLongPollingBot {
                 sendPortfolioPhoto(chatId);
             } else if (messageText.equals("/commands")) {
                 //todo - список всех команд
-                sendMessage(chatId, "привет еблан");
+                sendHelpMessage(chatId);
             } else if (messageText.equals("/generate_qr")) {
                 sendMessage(chatId, "Пожалуйста, введите текст или ссылку для генерации QR-кода:");
-                // Можно добавить состояние ожидания ввода данных для QR-кода
             } else if (messageText.startsWith("/generate_qr ")) {
                 String qrContent = messageText.substring("/generate_qr ".length());
                 sendQrCode(chatId, qrContent);
@@ -97,16 +96,13 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-
-    private void handleAiRequestAsync(long chatId, String messageText) {
-        // Асинхронная задача для обработки запроса
-        executorService.submit(() -> {
+    //todo в челом работает,но можно допилить
+    private CompletableFuture<Void> handleAiRequestAsync(long chatId, String messageText) {
+        return CompletableFuture.runAsync(() -> {
             Integer typingMessageId = null;
             try {
-                // Отправка "typing..." сообщения пользователю
                 typingMessageId = sendTypingMessage(chatId);
 
-                // Асинхронное поддержание "typing..." действия
                 ScheduledExecutorService typingExecutor = Executors.newScheduledThreadPool(1);
                 typingExecutor.scheduleAtFixedRate(() -> {
                     try {
@@ -119,18 +115,15 @@ public class TelegramBot extends TelegramLongPollingBot {
                     }
                 }, 0, 5, TimeUnit.SECONDS); // Выполнять каждые 5 секунд
 
-                // Обработка запроса к API
                 String aiResponse = openRouterService.askOpenRouter(messageText);
                 log.info("AI response: {}", aiResponse);
 
-                // Завершение работы "typing..."
                 typingExecutor.shutdown();
 
                 if (typingMessageId != null) {
                     deleteMessage(chatId, typingMessageId);
                 }
 
-                // Ответ пользователю
                 sendMessage(chatId, "\uD83E\uDD16 Ответ ИИ: \n" + aiResponse);
 
             } catch (IOException e) {
@@ -143,23 +136,14 @@ public class TelegramBot extends TelegramLongPollingBot {
                 sendMessage(chatId, "❌ Ошибка при обработке запроса. Пожалуйста, попробуйте еще раз.");
             }
         });
+
+
     }
 
 
     private void sendAboutDeveloper(long chatId) {
         executorService.submit(() -> {
-            String aboutText = "\n" +
-                    "Иван   \n" +
-                    "Бек-энд Java разработчик\n" +
-                    "\n" +
-                    "Являюсь бек-энд Java разработчиком с глубокими знаниями в области разработки веб-приложений. Мой профессиональный стек включает:\n" +
-                    "\n" +
-                    "- **Spring Boot**: создание мощных и масштабируемых приложений с использованием этого фреймворка, который ускоряет процесс разработки.\n" +
-                    "- **Spring Data JPA**: эффективная работа с базами данных, включая упрощение доступа к данным и управление сущностями.\n" +
-                    "- **Hibernate**: опыт в ORM для управления постоянным состоянием объектов, что позволяет значительно упростить взаимодействие с базами данных.\n" +
-                    "\n" +
-                    "Я обладаю навыками построения RESTful API, обеспечивая надежную и быструю связь между фронт-эндом и бек-эндом. \n" +
-                    "\n";
+            String aboutText = "\n" + "Иван   \n" + "Бек-энд Java разработчик\n" + "\n" + "Являюсь бек-энд Java разработчиком с глубокими знаниями в области разработки веб-приложений. Мой профессиональный стек включает:\n" + "\n" + "- **Spring Boot**: создание мощных и масштабируемых приложений с использованием этого фреймворка, который ускоряет процесс разработки.\n" + "- **Spring Data JPA**: эффективная работа с базами данных, включая упрощение доступа к данным и управление сущностями.\n" + "- **Hibernate**: опыт в ORM для управления постоянным состоянием объектов, что позволяет значительно упростить взаимодействие с базами данных.\n" + "\n" + "Я обладаю навыками построения RESTful API, обеспечивая надежную и быструю связь между фронт-эндом и бек-эндом. \n" + "\n";
             sendMessage(chatId, aboutText);
         });
 
@@ -194,33 +178,40 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    private void sendWelcomeMessage(long chatId) {
-        SendMessage message = new SendMessage();
-        message.setChatId(chatId);
-        message.setText("Привет, вот мой функционал:");
+    private CompletableFuture<Void> sendWelcomeMessage(long chatId) {
+        return CompletableFuture.runAsync(() -> {
+            SendMessage message = new SendMessage();
+            message.setChatId(chatId);
+            message.setText("Привет, вот мой функционал:");
 
-        ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
-        List<KeyboardRow> keyboard = new ArrayList<>();
+            ReplyKeyboardMarkup keyboardMarkup = new ReplyKeyboardMarkup();
+            List<KeyboardRow> keyboard = new ArrayList<>();
 
-        KeyboardRow row = new KeyboardRow();
-        row.add("Использовать ИИ(Beta version)");
-        row.add("О разработчике");
+            KeyboardRow row = new KeyboardRow();
+            row.add("Использовать ИИ(Beta version)");
+            row.add("О разработчике");
 
-        KeyboardRow row1 = new KeyboardRow();
-        row1.add("Портфолио");
-        row1.add("help");
+            KeyboardRow row1 = new KeyboardRow();
+            row1.add("Портфолио");
+            row1.add("help");
 
-        keyboard.add(row);
-        keyboard.add(row1);
-        keyboardMarkup.setKeyboard(keyboard);
-        keyboardMarkup.setResizeKeyboard(true);
-        message.setReplyMarkup(keyboardMarkup);
+            keyboard.add(row);
+            keyboard.add(row1);
+            keyboardMarkup.setKeyboard(keyboard);
+            keyboardMarkup.setResizeKeyboard(true);
+            message.setReplyMarkup(keyboardMarkup);
 
-        try {
-            execute(message);
-        } catch (TelegramApiException e) {
-            log.error("Ошибка при отправке сообщения: {}", e.getMessage());
-        }
+            try {
+                execute(message);
+            } catch (TelegramApiException e) {
+                throw new RuntimeException("Ошибка при отправке", e); // Пробрасываем исключение
+            }
+        }).thenRun(() -> {
+            log.info("Сообщение успешно отправлено в чат {}", chatId); // Логируем успех
+        }).exceptionally(ex -> {
+            log.error("Не удалось отправить приветствие: {}", ex.getMessage()); // Логируем ошибку
+            return null;
+        });
     }
 
     private void sendMessage(long chatId, String text) {

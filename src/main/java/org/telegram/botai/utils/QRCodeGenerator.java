@@ -23,7 +23,11 @@ public class QRCodeGenerator {
         BitMatrix bitMatrix = qrCodeWriter.encode(text, BarcodeFormat.QR_CODE, width, height, hints);
 
         Path path = FileSystems.getDefault().getPath(filePath);
+
         MatrixToImageWriter.writeToPath(bitMatrix, "PNG", path);
         System.out.println("QR-код успешно создан: " + filePath);
+    }
+    public void deleteQrFile(){
+
     }
 }
