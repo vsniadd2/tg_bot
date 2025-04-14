@@ -12,36 +12,47 @@ import java.util.concurrent.TimeUnit;
 @Service
 @Slf4j
 public class OpenRouterService {
-    private static final String OPENROUTER_API_KEY = "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"; //grok model
+    private static final String OPENROUTER_API_KEY = "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"; //grok model
     private static final String OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
     private final OkHttpClient client;
 
     public OpenRouterService() {
         this.client = new OkHttpClient.Builder()
-                .connectTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(60, TimeUnit.SECONDS)
-                .writeTimeout(30, TimeUnit.SECONDS)
+                .connectTimeout(60, TimeUnit.SECONDS)
+                .readTimeout(120, TimeUnit.SECONDS)
+                .writeTimeout(60, TimeUnit.SECONDS)
                 .build();
     }
 
     public String askOpenRouter(String question) throws IOException {
         JSONObject requestBody = new JSONObject();
-        requestBody.put("model", "x-ai/grok-3-mini-beta");
+        requestBody.put("model", "openai/gpt-4-turbo"); // Используем актуальную модель
 
         JSONArray messages = new JSONArray();
         JSONObject message = new JSONObject();
         message.put("role", "user");
-        message.put("content", question +"пиши красиво без * в твоем ответе");
 
+        // Создаем массив content только с текстом
+        JSONArray contentArray = new JSONArray();
+
+        // Текстовая часть
+        JSONObject textContent = new JSONObject();
+        textContent.put("type", "text");
+        textContent.put("text", question + " пиши красиво без * в твоем ответе");
+        contentArray.put(textContent);
+
+        message.put("content", contentArray);
         messages.put(message);
         requestBody.put("messages", messages);
 
-        RequestBody body = RequestBody.create(requestBody.toString(), MediaType.parse("application/json"));
+        RequestBody body = RequestBody.create(requestBody.toString(), MediaType.get("application/json"));
         Request request = new Request.Builder()
                 .url(OPENROUTER_API_URL)
                 .post(body)
                 .addHeader("Authorization", "Bearer " + OPENROUTER_API_KEY)
                 .addHeader("Content-Type", "application/json")
+                .addHeader("HTTP-Referer", "YOUR_WEBSITE_URL") // Рекомендуется
+                .addHeader("X-Title", "YOUR_APP_NAME") // Опционально
                 .build();
 
         try (Response response = client.newCall(request).execute()) {
@@ -52,15 +63,15 @@ public class OpenRouterService {
             String responseBody = response.body().string();
             JSONObject jsonResponse = new JSONObject(responseBody);
 
-            log.info("Полный ответ от API: " + jsonResponse.toString(2));
+            log.info("Полный ответ от API: {}", jsonResponse.toString(2));
 
-            // Проверяем наличие ошибки в ответе API
+            // Обработка ошибок API
             if (jsonResponse.has("error")) {
                 String errorMessage = jsonResponse.getJSONObject("error").getString("message");
                 throw new IOException("Ошибка API: " + errorMessage);
             }
 
-            // Проверяем, содержит ли ответ choices
+            // Проверка наличия choices
             if (!jsonResponse.has("choices") || jsonResponse.getJSONArray("choices").length() == 0) {
                 throw new IOException("Ответ от API не содержит choices. Полный ответ: " + jsonResponse.toString(2));
             }

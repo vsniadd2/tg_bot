@@ -70,6 +70,8 @@ public class TelegramBot extends TelegramLongPollingBot {
                 aiModeActive.put(chatId, false);
                 sendWelcomeMessage(chatId);
             } else if (messageText.equals("Использовать ИИ(Beta version)")) {
+                sendMessage(chatId,"В настоящее время ИИ к сожалениию не работает(");
+                //todo fix AI
                 aiModeActive.put(chatId, true);
                 sendMessage(chatId, "\uD83D\uDD2E Режим ИИ активирован. Напишите ваш вопрос:");
             } else if (messageText.equals("О разработчике")) {
