@@ -1,5 +1,6 @@
 package org.telegram.botai.service;
 
+import lombok.extern.slf4j.Slf4j;
 import okhttp3.*;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -9,28 +10,31 @@ import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
 @Service
+@Slf4j
 public class OpenRouterService {
-    private static final String OPENROUTER_API_KEY = "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";
+    private static final String OPENROUTER_API_KEY = "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"; //grok model
     private static final String OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
+    private final OkHttpClient client;
 
-    public String askOpenRouter(String question) throws IOException {
-        OkHttpClient client = new OkHttpClient.Builder()
+    public OpenRouterService() {
+        this.client = new OkHttpClient.Builder()
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(60, TimeUnit.SECONDS)
                 .writeTimeout(30, TimeUnit.SECONDS)
                 .build();
+    }
 
-
+    public String askOpenRouter(String question) throws IOException {
         JSONObject requestBody = new JSONObject();
-        requestBody.put("model", "qwen/qwq-32b:free");
-        requestBody.put("messages", new JSONArray()
-                .put(new JSONObject()
-                        .put("role", "user")
-                        .put("content", question + "\nНапиши ответ без следующих символов: '*' \n" +
-                                "Оформи красиво под Telegram!!!!")
-                )
-        );
-        requestBody.put("max_tokens", 2400);
+        requestBody.put("model", "x-ai/grok-3-mini-beta");
+
+        JSONArray messages = new JSONArray();
+        JSONObject message = new JSONObject();
+        message.put("role", "user");
+        message.put("content", question +"пиши красиво без * в твоем ответе");
+
+        messages.put(message);
+        requestBody.put("messages", messages);
 
         RequestBody body = RequestBody.create(requestBody.toString(), MediaType.parse("application/json"));
         Request request = new Request.Builder()
@@ -48,7 +52,7 @@ public class OpenRouterService {
             String responseBody = response.body().string();
             JSONObject jsonResponse = new JSONObject(responseBody);
 
-            System.out.println("Полный ответ от API: " + jsonResponse.toString(2));
+            log.info("Полный ответ от API: " + jsonResponse.toString(2));
 
             // Проверяем наличие ошибки в ответе API
             if (jsonResponse.has("error")) {
