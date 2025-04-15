@@ -43,7 +43,6 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     private final OpenRouterService openRouterService;
     private final Map<Long, Boolean> aiModeActive = new ConcurrentHashMap<>();
-    //TODO(разобраться про ассинхронность)
     private final ExecutorService executorService = Executors.newFixedThreadPool(10);
 
 
@@ -70,8 +69,8 @@ public class TelegramBot extends TelegramLongPollingBot {
                 aiModeActive.put(chatId, false);
                 sendWelcomeMessage(chatId);
             } else if (messageText.equals("Использовать ИИ(Beta version)")) {
-                sendMessage(chatId,"В настоящее время ИИ к сожалениию не работает(");
-                //todo fix AI
+                sendMessage(chatId, "В настоящее время ИИ к сожалениию не работает(");
+                //todo fix AI -> openrouter ограниченный
                 aiModeActive.put(chatId, true);
                 sendMessage(chatId, "\uD83D\uDD2E Режим ИИ активирован. Напишите ваш вопрос:");
             } else if (messageText.equals("О разработчике")) {
@@ -83,7 +82,6 @@ public class TelegramBot extends TelegramLongPollingBot {
             } else if (messageText.equals("Портфолио")) {
                 sendPortfolioPhoto(chatId);
             } else if (messageText.equals("/commands")) {
-                //todo - список всех команд
                 sendHelpMessage(chatId);
             } else if (messageText.equals("/generate_qr")) {
                 sendMessage(chatId, "Пожалуйста, введите текст или ссылку для генерации QR-кода:");
@@ -98,77 +96,93 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    //todo в челом работает,но можно допилить
+    //todo в челом работает,но можно допилить ассинхронность
     private CompletableFuture<Void> handleAiRequestAsync(long chatId, String messageText) {
-        return CompletableFuture.runAsync(() -> {
-            Integer typingMessageId = null;
+        // Создаем CompletableFuture для typing сообщения
+        CompletableFuture<Integer> typingMessageFuture = sendTypingMessage(chatId);
+
+        // Создаем executor для периодической отправки typing статуса
+        ScheduledExecutorService typingExecutor = Executors.newScheduledThreadPool(1);
+        ScheduledFuture<?> typingTask = typingExecutor.scheduleAtFixedRate(() -> {
             try {
-                typingMessageId = sendTypingMessage(chatId);
-
-                ScheduledExecutorService typingExecutor = Executors.newScheduledThreadPool(1);
-                typingExecutor.scheduleAtFixedRate(() -> {
-                    try {
-                        SendChatAction chatAction = new SendChatAction();
-                        chatAction.setChatId(String.valueOf(chatId));
-                        chatAction.setAction(ActionType.TYPING);
-                        execute(chatAction);
-                    } catch (Exception e) {
-                        log.error("Ошибка в 'typing' процессе: ", e);
-                    }
-                }, 0, 5, TimeUnit.SECONDS); // Выполнять каждые 5 секунд
-
-                String aiResponse = openRouterService.askOpenRouter(messageText);
-                log.info("AI response: {}", aiResponse);
-
-                typingExecutor.shutdown();
-
-                if (typingMessageId != null) {
-                    deleteMessage(chatId, typingMessageId);
-                }
-
-                sendMessage(chatId, "\uD83E\uDD16 Ответ ИИ: \n" + aiResponse);
-
-            } catch (IOException e) {
-                log.error("Ошибка при запросе к API: ", e);
-
-                if (typingMessageId != null) {
-                    deleteMessage(chatId, typingMessageId);
-                }
-
-                sendMessage(chatId, "❌ Ошибка при обработке запроса. Пожалуйста, попробуйте еще раз.");
+                SendChatAction chatAction = new SendChatAction();
+                chatAction.setChatId(String.valueOf(chatId));
+                chatAction.setAction(ActionType.TYPING);
+                execute(chatAction);
+            } catch (Exception e) {
+                log.error("Ошибка в 'typing' процессе: ", e);
             }
+        }, 0, 5, TimeUnit.SECONDS);
+
+        // Основная цепочка асинхронных операций
+        return typingMessageFuture.thenCompose(typingMessageId -> {
+            return CompletableFuture.supplyAsync(() -> {
+                        try {
+                            return openRouterService.askOpenRouter(messageText);
+                        } catch (IOException e) {
+                            throw new CompletionException(e);
+                        }
+                    }, executorService)
+                    .thenAccept(aiResponse -> {
+                        // Останавливаем typing статус
+                        typingTask.cancel(true);
+                        typingExecutor.shutdown();
+
+                        // Удаляем сообщение "печатает..." если оно было отправлено
+                        if (typingMessageId != null) {
+                            deleteMessage(chatId, typingMessageId);
+                        }
+
+                        // Отправляем ответ ИИ
+                        sendMessage(chatId, "\uD83E\uDD16 AI Answer: \n" + aiResponse);
+                    })
+                    .exceptionally(e -> {
+                        // Обработка ошибок
+                        typingTask.cancel(true);
+                        typingExecutor.shutdown();
+
+                        if (typingMessageId != null) {
+                            deleteMessage(chatId, typingMessageId);
+                        }
+
+                        sendMessage(chatId, "❌ Error processing request. Please try again..");
+                        log.error("Ошибка при обработке запроса: ", e);
+                        return null;
+                    });
         });
-
-
     }
 
 
-    private void sendAboutDeveloper(long chatId) {
-        executorService.submit(() -> {
+    private CompletableFuture<Void> sendAboutDeveloper(long chatId) {
+        return CompletableFuture.runAsync(() -> {
             String aboutText = "\n" + "Иван   \n" + "Бек-энд Java разработчик\n" + "\n" + "Являюсь бек-энд Java разработчиком с глубокими знаниями в области разработки веб-приложений. Мой профессиональный стек включает:\n" + "\n" + "- **Spring Boot**: создание мощных и масштабируемых приложений с использованием этого фреймворка, который ускоряет процесс разработки.\n" + "- **Spring Data JPA**: эффективная работа с базами данных, включая упрощение доступа к данным и управление сущностями.\n" + "- **Hibernate**: опыт в ORM для управления постоянным состоянием объектов, что позволяет значительно упростить взаимодействие с базами данных.\n" + "\n" + "Я обладаю навыками построения RESTful API, обеспечивая надежную и быструю связь между фронт-эндом и бек-эндом. \n" + "\n";
             sendMessage(chatId, aboutText);
-        });
+        }, executorService);
+
 
     }
 
-    private Integer sendTypingMessage(long chatId) {
-        try {
-            SendChatAction chatAction = new SendChatAction();
-            chatAction.setChatId(String.valueOf(chatId));
-            chatAction.setAction(ActionType.TYPING);
-            execute(chatAction);
+    private CompletableFuture<Integer> sendTypingMessage(long chatId) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                SendChatAction chatAction = new SendChatAction();
+                chatAction.setChatId(String.valueOf(chatId));
+                chatAction.setAction(ActionType.TYPING);
+                execute(chatAction);
 
-            SendMessage typingMessage = new SendMessage();
-            typingMessage.setChatId(chatId);
-            typingMessage.setText("ИИ печатает ответ...");
+                SendMessage typingMessage = new SendMessage();
+                typingMessage.setChatId(chatId);
+                typingMessage.setText("ИИ печатает ответ...");
 
-            Message sentMessage = execute(typingMessage);
-            return sentMessage.getMessageId();
+                Message sentMessage = execute(typingMessage);
+                return sentMessage.getMessageId();
 
-        } catch (TelegramApiException e) {
-            log.error("Ошибка при отправке сообщения 'печатает...': {}", e.getMessage());
-            return null;
-        }
+            } catch (TelegramApiException e) {
+                log.error("Ошибка при отправке сообщения 'печатает...': {}", e.getMessage());
+                return null;
+            }
+
+        }, executorService);
 
     }
 
@@ -228,17 +242,15 @@ public class TelegramBot extends TelegramLongPollingBot {
         }
     }
 
-    //todo - вставитьссылки для фото портфолио
+    //todo - вставить ссылки для фото портфолио
     private void sendPortfolioPhoto(long chatId) {
         try {
             List<InputMedia> medias = new ArrayList<>();
 
             InputMediaPhoto photo = new InputMediaPhoto();
-            photo.setMedia("https://sun9-13.userapi.com/impg/aWvZmbWBg6eLWtPODZIaH_2oEsK84VI5NFJIDg/IckZIMsHyvs.jpg?size=807x509&quality=95&sign=ffefd03f828b8580e8f30bc9bd308089&type=album");
-
+            photo.setMedia("https://ekskursii.by/images/obj4/20088/0_.jpg");
             InputMediaPhoto photo1 = new InputMediaPhoto();
-            photo1.setMedia("https://assets-webflow.ngcdn.ru/cdn.prod/6294b12fe96345a83876d4a5/679a74ccd3bc4fb18423c158_AD_4nXclRbUgUrOdjZ4nSs1kATWYsqFhTjvLVNPVVUXE23-qgwwO0NDupaA9G-lRr5-BIiW1tIsjk2Hn9W9puu-4gIC9iDU5wUuO_3Ze8SIiraAGKr0J6i5ILEP-TDZvGH3hiq2ZP7k4DA.jpeg");
-
+            photo1.setMedia("https://cdn2.tu-tu.ru/image/pagetree_node_data/1/01e9ab120a7c5eb5923719e0ae3c8bc4/");
             medias.add(photo);
             medias.add(photo1);
 

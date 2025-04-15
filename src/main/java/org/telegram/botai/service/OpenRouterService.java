@@ -1,9 +1,11 @@
 package org.telegram.botai.service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.*;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -12,7 +14,9 @@ import java.util.concurrent.TimeUnit;
 @Service
 @Slf4j
 public class OpenRouterService {
-    private static final String OPENROUTER_API_KEY = "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"; //grok model
+
+    @Value("${api.key}")
+    private String OPENROUTER_API_KEY; //grok model
     private static final String OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
     private final OkHttpClient client;
 
