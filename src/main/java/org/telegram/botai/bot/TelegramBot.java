@@ -177,7 +177,6 @@ public class TelegramBot extends TelegramLongPollingBot {
             }
 
         }, executorService);
-
     }
 
     private void deleteMessage(long chatId, int messageId) {

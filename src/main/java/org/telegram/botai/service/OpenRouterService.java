@@ -36,7 +36,6 @@ public class OpenRouterService {
         JSONObject message = new JSONObject();
         message.put("role", "user");
 
-
         JSONArray contentArray = new JSONArray();
 
         JSONObject textContent = new JSONObject();
