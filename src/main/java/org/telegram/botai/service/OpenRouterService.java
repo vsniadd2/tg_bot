@@ -30,16 +30,15 @@ public class OpenRouterService {
 
     public String askOpenRouter(String question) throws IOException {
         JSONObject requestBody = new JSONObject();
-        requestBody.put("model", "openai/gpt-4-turbo"); // Используем актуальную модель
+        requestBody.put("model", "openai/gpt-4-turbo");
 
         JSONArray messages = new JSONArray();
         JSONObject message = new JSONObject();
         message.put("role", "user");
 
-        // Создаем массив content только с текстом
+
         JSONArray contentArray = new JSONArray();
 
-        // Текстовая часть
         JSONObject textContent = new JSONObject();
         textContent.put("type", "text");
         textContent.put("text", question + " пиши красиво без * в твоем ответе");
@@ -55,8 +54,8 @@ public class OpenRouterService {
                 .post(body)
                 .addHeader("Authorization", "Bearer " + OPENROUTER_API_KEY)
                 .addHeader("Content-Type", "application/json")
-                .addHeader("HTTP-Referer", "YOUR_WEBSITE_URL") // Рекомендуется
-                .addHeader("X-Title", "YOUR_APP_NAME") // Опционально
+                .addHeader("HTTP-Referer", "YOUR_WEBSITE_URL")
+                .addHeader("X-Title", "YOUR_APP_NAME")
                 .build();
 
         try (Response response = client.newCall(request).execute()) {
@@ -69,13 +68,11 @@ public class OpenRouterService {
 
             log.info("Полный ответ от API: {}", jsonResponse.toString(2));
 
-            // Обработка ошибок API
             if (jsonResponse.has("error")) {
                 String errorMessage = jsonResponse.getJSONObject("error").getString("message");
                 throw new IOException("Ошибка API: " + errorMessage);
             }
 
-            // Проверка наличия choices
             if (!jsonResponse.has("choices") || jsonResponse.getJSONArray("choices").length() == 0) {
                 throw new IOException("Ответ от API не содержит choices. Полный ответ: " + jsonResponse.toString(2));
             }

@@ -98,10 +98,8 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     //todo в челом работает,но можно допилить ассинхронность
     private CompletableFuture<Void> handleAiRequestAsync(long chatId, String messageText) {
-        // Создаем CompletableFuture для typing сообщения
         CompletableFuture<Integer> typingMessageFuture = sendTypingMessage(chatId);
 
-        // Создаем executor для периодической отправки typing статуса
         ScheduledExecutorService typingExecutor = Executors.newScheduledThreadPool(1);
         ScheduledFuture<?> typingTask = typingExecutor.scheduleAtFixedRate(() -> {
             try {
@@ -114,7 +112,6 @@ public class TelegramBot extends TelegramLongPollingBot {
             }
         }, 0, 5, TimeUnit.SECONDS);
 
-        // Основная цепочка асинхронных операций
         return typingMessageFuture.thenCompose(typingMessageId -> {
             return CompletableFuture.supplyAsync(() -> {
                         try {
@@ -124,20 +121,17 @@ public class TelegramBot extends TelegramLongPollingBot {
                         }
                     }, executorService)
                     .thenAccept(aiResponse -> {
-                        // Останавливаем typing статус
+
                         typingTask.cancel(true);
                         typingExecutor.shutdown();
 
-                        // Удаляем сообщение "печатает..." если оно было отправлено
                         if (typingMessageId != null) {
                             deleteMessage(chatId, typingMessageId);
                         }
 
-                        // Отправляем ответ ИИ
                         sendMessage(chatId, "\uD83E\uDD16 AI Answer: \n" + aiResponse);
                     })
                     .exceptionally(e -> {
-                        // Обработка ошибок
                         typingTask.cancel(true);
                         typingExecutor.shutdown();
 
@@ -269,11 +263,9 @@ public class TelegramBot extends TelegramLongPollingBot {
     private void sendQrCode(long chatId, String qrContent) {
         executorService.submit(() -> {
             try {
-                // Генерация QR-кода и сохранение в файл
                 String filePath = "qr_" + UUID.randomUUID() + ".png";
                 QRCodeGenerator.generateQRCode(qrContent, filePath, 300, 300);
 
-                // Отправка QR-кода через бота
                 SendPhoto sendPhoto = new SendPhoto();
                 sendPhoto.setChatId(chatId);
                 sendPhoto.setPhoto(new InputFile(new File(filePath)));
